@@ -97,6 +97,10 @@ if [ ! -e $ROOTFS_DIR/.installed ]; then
   # 创建临时目录
   mkdir -p /tmp
   
+  # 创建Ubuntu根文件系统目录
+  UBUNTU_DIR="$ROOTFS_DIR/ubuntu-rootfs"
+  mkdir -p "$UBUNTU_DIR"
+  
   # 下载Ubuntu基础系统，增加超时时间
   echo "正在下载 ubuntu-base-20.04.4-base-${ARCH_ALT}.tar.gz ..."
   if ! curl --retry $max_retries --connect-timeout $timeout --max-time 300 -L -o /tmp/rootfs.tar.gz \
@@ -116,12 +120,35 @@ if [ ! -e $ROOTFS_DIR/.installed ]; then
     exit 1
   fi
   
-  echo -e "${CYAN}解压Ubuntu基础系统到 $ROOTFS_DIR...${RESET_COLOR}"
-  # 解压到根文件系统目录
-  if ! tar -xf /tmp/rootfs.tar.gz -C $ROOTFS_DIR; then
+  echo -e "${CYAN}解压Ubuntu基础系统到 $UBUNTU_DIR...${RESET_COLOR}"
+  # 先清理目录，然后解压到专门的Ubuntu目录
+  rm -rf "$UBUNTU_DIR"
+  mkdir -p "$UBUNTU_DIR"
+  
+  if ! tar -xf /tmp/rootfs.tar.gz -C "$UBUNTU_DIR" --no-same-owner 2>/dev/null; then
     echo -e "${RED}解压失败${RESET_COLOR}"
     exit 1
   fi
+  
+  # 将Ubuntu文件系统移动到根目录
+  echo -e "${CYAN}配置Ubuntu文件系统...${RESET_COLOR}"
+  
+  # 移动所有文件到根目录，避免符号链接冲突
+  cd "$UBUNTU_DIR"
+  for item in *; do
+    if [ "$item" != "." ] && [ "$item" != ".." ]; then
+      if [ -e "$ROOTFS_DIR/$item" ] && [ "$item" != "ubuntu-rootfs" ]; then
+        rm -rf "$ROOTFS_DIR/$item"
+      fi
+      if [ "$item" != "ubuntu-rootfs" ]; then
+        mv "$item" "$ROOTFS_DIR/"
+      fi
+    fi
+  done
+  cd "$ROOTFS_DIR"
+  
+  # 清理临时Ubuntu目录
+  rm -rf "$UBUNTU_DIR"
   
   # 验证关键文件是否存在
   if [ ! -f "$ROOTFS_DIR/bin/bash" ] && [ ! -f "$ROOTFS_DIR/usr/bin/bash" ]; then
@@ -172,6 +199,7 @@ fi
 if [ ! -e $ROOTFS_DIR/.installed ]; then
   echo -e "${CYAN}配置DNS服务器...${RESET_COLOR}"
   # 设置DNS服务器
+  mkdir -p $ROOTFS_DIR/etc
   printf "nameserver 1.1.1.1\nnameserver 1.0.0.1\n" > ${ROOTFS_DIR}/etc/resolv.conf
   
   echo -e "${CYAN}清理临时文件...${RESET_COLOR}"
@@ -186,6 +214,7 @@ fi
 echo -e "${CYAN}创建用户目录: $ROOTFS_DIR/home/$CURRENT_USER${RESET_COLOR}"
 # 创建用户目录
 mkdir -p $ROOTFS_DIR/home/$CURRENT_USER
+mkdir -p $ROOTFS_DIR/root
 
 echo -e "${CYAN}创建.bashrc文件...${RESET_COLOR}"
 # 创建正常的.bashrc文件
