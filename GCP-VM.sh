@@ -50,7 +50,7 @@ VM_COUNT=12
 MACHINE_TYPE="f1-micro"
 
 # 硬盘配置
-BOOT_DISK_SIZE="20GB"
+BOOT_DISK_SIZE="10GB"
 BOOT_DISK_TYPE="pd-standard"
 
 # 操作系统镜像配置
